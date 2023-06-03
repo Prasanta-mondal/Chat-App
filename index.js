@@ -1,25 +1,29 @@
-// Node server which will handle socket io connections
-const io = require('socket.io')(8000)
+/**
+ * An abstraction for slicing an arraybuffer even when
+ * ArrayBuffer.prototype.slice is not supported
+ *
+ * @api public
+ */
 
-const users = {};
+module.exports = function(arraybuffer, start, end) {
+  var bytes = arraybuffer.byteLength;
+  start = start || 0;
+  end = end || bytes;
 
-io.on('connection', socket =>{
-    // If any new user joins, let other users connected to the server know!
-    socket.on('new-user-joined', name =>{ 
-        users[socket.id] = name;
-        socket.broadcast.emit('user-joined', name);
-    });
+  if (arraybuffer.slice) { return arraybuffer.slice(start, end); }
 
-    // If someone sends a message, broadcast it to other people
-    socket.on('send', message =>{
-        socket.broadcast.emit('receive', {message: message, name: users[socket.id]})
-    });
+  if (start < 0) { start += bytes; }
+  if (end < 0) { end += bytes; }
+  if (end > bytes) { end = bytes; }
 
-    // If someone leaves the chat, let others know 
-    socket.on('disconnect', message =>{
-        socket.broadcast.emit('left', users[socket.id]);
-        delete users[socket.id];
-    });
+  if (start >= bytes || start >= end || bytes === 0) {
+    return new ArrayBuffer(0);
+  }
 
-
-})
+  var abv = new Uint8Array(arraybuffer);
+  var result = new Uint8Array(end - start);
+  for (var i = start, ii = 0; i < end; i++, ii++) {
+    result[ii] = abv[i];
+  }
+  return result.buffer;
+};
